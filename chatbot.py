@@ -500,11 +500,11 @@ class CTAEngine:
             # Determinar qual áudio usar baseado no horário
             current_hour = datetime.now().hour
             if 5 <= current_hour < 12:
-                audio_key = "bom_dia_nao_sou_fake"
+                audio_key = "nao_sou_fake"
             elif 12 <= current_hour < 18:
-                audio_key = "boa_tarde_nao_sou_fake"
+                audio_key = "nao_sou_fake"
             else:
-                audio_key = "boa_noite_nao_sou_fake"
+                audio_key = "nao_sou_fake"
                 
             return {
                 "text": "Não sou fake não, amor! Ouça minha voz... 😘",
