@@ -37,7 +37,9 @@ hide_streamlit_style = """
     .stApp {
         margin: 0 !important; 
         padding: 0 !important;
-        background: linear-gradient(135deg, #1a0033 0%, #2d004d 50%, #1a0033 100%);
+        background: radial-gradient(1200px 500px at -10% -10%, rgba(255, 0, 153, 0.25) 0%, transparent 60%) ,
+                    radial-gradient(1400px 600px at 110% 10%, rgba(148, 0, 211, .25) 0%, transparent 55%),
+                    linear-gradient(135deg, #140020 0%, #25003b 50%, #11001c 100%);
         color: white;
     }
     .stChatMessage {padding: 12px !important; border-radius: 15px !important; margin: 8px 0 !important;}
@@ -46,6 +48,7 @@ hide_streamlit_style = """
         background: linear-gradient(45deg, #ff1493, #9400d3) !important;
         color: white !important;
         border: none !important;
+        border-radius: 12px !important;
     }
     .stButton > button:hover {
         transform: translateY(-2px) !important; 
@@ -130,6 +133,13 @@ class Config:
         "https://i.ibb.co/Q7s9Zwcr/BY-Admiregirls-su-Admiregirls-su-183.jpg",
         "https://i.ibb.co/0jRMxrFB/BY-Admiregirls-su-Admiregirls-su-271.jpg"
     ]
+    # Prévias usadas na Home (corrige aviso de parâmetro deprecado)
+    IMG_HOME_PREVIEWS = [
+        "https://i.ibb.co/5Gfw3hQ/home-prev-1.jpg",
+        "https://i.ibb.co/vkXch6N/home-prev-2.jpg",
+        "https://i.ibb.co/v4s5fnW/home-prev-3.jpg",
+        "https://i.ibb.co/7gVtGkz/home-prev-4.jpg"
+    ]
     SOCIAL_LINKS = {
         "instagram": "https://instagram.com/myllealves",
         "onlyfans": "https://onlyfans.com/myllealves",
@@ -143,14 +153,21 @@ class Config:
         "twitter": "🐦 Twitter"
     }
     
-    # URLs dos áudios
+    # Áudios (atualizados + novos)
     AUDIOS = {
-        "nao_sou_fake": "https://github.com/andrearagaoregis/testes2/raw/refs/heads/main/assets/nao%20sou%20fake%20nao.mp3",
-        "claro_tenho_amostra_gratis": "https://github.com/andrearagaoregis/MylleAlves/raw/refs/heads/main/assets/Claro%20eu%20tenho%20amostra%20gr%C3%A1tis.mp3",
-        "o_que_achou_amostras": "https://github.com/andrearagaoregis/MylleAlves/raw/refs/heads/main/assets/O%20que%20achou%20das%20amostras.mp3",
-        "pq_nao_faco_chamada": "https://github.com/andrearagaoregis/MylleAlves/raw/refs/heads/main/assets/Pq%20nao%20fa%C3%A7o%20mais%20chamada.mp3",
-        "tenho_conteudos_que_vai_amar": "https://github.com/andrearagaoregis/MylleAlves/raw/refs/heads/main/assets/eu%20tenho%20uns%20conteudos%20aqui%20que%20vc%20vai%20amar.mp3",
-        "esperando_responder": "https://github.com/andrearagaoregis/MylleAlves/raw/refs/heads/main/assets/vida%20to%20esperando%20voce%20me%20responder%20gatinho.mp3"
+        "claro_tenho_amostra_gratis": "https://github.com/andrearagaoregis/testes2/raw/refs/heads/main/assets/Claro%20eu%20tenho%20amostra%20gr%C3%A1tis.mp3",
+        "imagina_ela_bem_rosinha": "https://github.com/andrearagaoregis/testes2/raw/refs/heads/main/assets/Imagina%20s%C3%B3%20ela%20bem%20rosinha.mp3",
+        "o_que_achou_amostras": "https://github.com/andrearagaoregis/testes2/raw/refs/heads/main/assets/O%20que%20achou%20das%20amostras.mp3",
+        "oi_meu_amor_tudo_bem": "https://github.com/andrearagaoregis/testes2/raw/refs/heads/main/assets/Oi%20meu%20amor%20tudo%20bem.mp3",
+        "pq_nao_faco_chamada": "https://github.com/andrearagaoregis/testes2/raw/refs/heads/main/assets/Pq%20nao%20fa%C3%A7o%20mais%20chamada.mp3",
+        "ver_nua_tem_que_comprar": "https://github.com/andrearagaoregis/testes2/raw/refs/heads/main/assets/Pra%20me%20ver%20nua%20tem%20que%20comprar%20os%20packs.mp3",
+        "eu_tenho_uns_conteudos_que_vai_amar": "https://github.com/andrearagaoregis/testes2/raw/refs/heads/main/assets/eu%20tenho%20uns%20conteudos%20aqui%20que%20vc%20vai%20amar.mp3",
+        "nao_sou_fake_nao": "https://github.com/andrearagaoregis/testes2/raw/refs/heads/main/assets/nao%20sou%20fake%20nao.mp3",
+        "vida_to_esperando_voce_me_responder_gatinho": "https://github.com/andrearagaoregis/testes2/raw/refs/heads/main/assets/vida%20to%20esperando%20voce%20me%20responder%20gatinho.mp3",
+        # versões antigas (mantidas para compatibilidade)
+        "boa_noite_nao_sou_fake": "https://github.com/andrearagaoregis/MylleAlves/raw/refs/heads/main/assets/Boa%20noite%20-%20N%C3%A3o%20sou%20fake%20n%C3%A3o....mp3",
+        "boa_tarde_nao_sou_fake": "https://github.com/andrearagaoregis/MylleAlves/raw/refs/heads/main/assets/Boa%20tarde%20-%20N%C3%A3o%20sou%20fake%20n%C3%A3o....mp3",
+        "bom_dia_nao_sou_fake": "https://github.com/andrearagaoregis/MylleAlves/raw/refs/heads/main/assets/Bom%20dia%20-%20n%C3%A3o%20sou%20fake%20n%C3%A3o....mp3"
     }
 
 # ======================
@@ -488,7 +505,6 @@ class CTAEngine:
         if 'audio_count' not in st.session_state:
             st.session_state.audio_count = 0
             
-        # Alternar entre texto e áudio (15% áudio, 85% texto)
         return random.random() < 0.15
 
     def generate_response_based_on_learning(self, user_input: str, user_id: str) -> Dict:
@@ -497,18 +513,10 @@ class CTAEngine:
         
         # Verificar se o usuário desconfia que é fake/bot
         if any(word in user_input for word in ["fake", "falsa", "bot", "robô", "artificial", "não é real", "é mentira"]):
-            # Determinar qual áudio usar baseado no horário
-            current_hour = datetime.now().hour
-            if 5 <= current_hour < 12:
-                audio_key = "nao_sou_fake"
-            elif 12 <= current_hour < 18:
-                audio_key = "nao_sou_fake"
-            else:
-                audio_key = "nao_sou_fake"
-                
+            # Selecionar áudio genérico de fake
             return {
                 "text": "Não sou fake não, amor! Ouça minha voz... 😘",
-                "audio": audio_key,
+                "audio": "nao_sou_fake_nao",
                 "cta": {"show": False}
             }
         
@@ -528,26 +536,31 @@ class CTAEngine:
                     "cta": {"show": True, "label": "🎬 Ver Vídeos", "target": "offers"}
                 }
         
-        # Respostas padrão baseadas no conteúdo
-        if any(p in user_input for p in ["foto", "fotos", "buceta", "peito", "bunda", "nude", "nua"]):
+        # Regras temáticas com áudios
+        if any(x in user_input for x in ["amostra", "amostras", "grátis", "gratis", "sample", "free"]):
             return {
-                "text": random.choice([
-                    "Ah, quer me ver? 😈 Tenho umas fotinhas bem quentes... mas o que é realmente bom tá no pack",
-                    "Minhas fotos são bem ousadas, hein... 😏 Mas aqui eu só mostro preview, o conteúdo completo é pago",
-                    "Eu adoro tirar fotos... especialmente as mais picantes 🔥 Quer ver tudo? Tem que pegar o pack"
-                ]),
-                "cta": {
-                    "show": True,
-                    "label": "📦 Ver Pack Completo",
-                    "target": "offers"
-                }
+                "text": "Claro que tenho amostra pra te deixar com mais vontade 😈",
+                "audio": "claro_tenho_amostra_gratis",
+                "cta": {"show": True, "label": "👀 Ver Prévia VIP", "target": "gallery"}
+            }
+        if any(x in user_input for x in ["nua", "nude"]):
+            return {
+                "text": "Pra me ver nua é no pack, amor... eu me entrego por completo lá 😏",
+                "audio": "ver_nua_tem_que_comprar",
+                "cta": {"show": True, "label": "📦 Ver Packs", "target": "offers"}
+            }
+        if "rosinha" in user_input:
+            return {
+                "text": "Imagina só ela rosinha e bem inchadinha... 🔥",
+                "audio": "imagina_ela_bem_rosinha",
+                "cta": {"show": True, "label": "🔥 Ver Agora", "target": "offers"}
             }
         
         elif any(v in user_input for v in ["video", "transar", "masturbar", "sexy"]):
             return {
                 "text": random.choice([
                     "Meus vídeos são bem quentes... 😈 Mas não é qualquer um que vê, só quem compra o pack",
-                    "Gravei uns vídeos bem ousados... 👅 Quer ver? Tem que valorizar seu conteúdo",
+                    "Gravei uns vídeos bem ousados... 👅 Quer ver? Tem que valorizar meu conteúdo",
                     "Nos meus vídeos eu solto a imaginação 😏 Mas aqui eu só mostro pra quem merece"
                 ]),
                 "cta": {
@@ -684,15 +697,26 @@ class ApiService:
                 else:
                     resposta = json.loads(gemini_response)
                 
-                # Decidir se deve usar áudio (15% das vezes)
-                if CTAEngine().should_use_audio() and "audio" not in resposta:
-                    # Selecionar áudio apropriado baseado no contexto
-                    if any(word in prompt.lower() for word in ["amostra", "grátis", "sample", "free"]):
-                        resposta["audio"] = "claro_tenho_amostra_gratis"
-                    elif any(word in prompt.lower() for word in ["foto", "fotos", "imagem", "video", "vídeos"]):
-                        resposta["audio"] = "tenho_conteudos_que_vai_amar"
-                    elif any(word in prompt.lower() for word in ["chamada", "videochamada", "ligação", "call"]):
-                        resposta["audio"] = "pq_nao_faco_chamada"
+                # Decidir se deve usar áudio (15% das vezes) ou baseado em gatilho
+                lower_prompt = prompt.lower()
+                audio_choice = None
+                if any(x in lower_prompt for x in ["amostra", "amostras", "grátis", "gratis", "sample", "free"]):
+                    audio_choice = "claro_tenho_amostra_gratis"
+                elif any(x in lower_prompt for x in ["oi", "olá", "tudo bem"]) and len(st.session_state.messages) < 4:
+                    audio_choice = "oi_meu_amor_tudo_bem"
+                elif any(x in lower_prompt for x in ["nua", "nude"]):
+                    audio_choice = "ver_nua_tem_que_comprar"
+                elif "rosinha" in lower_prompt:
+                    audio_choice = "imagina_ela_bem_rosinha"
+                elif any(x in lower_prompt for x in ["chamada", "videochamada", "ligação", "call"]):
+                    audio_choice = "pq_nao_faco_chamada"
+                elif any(x in lower_prompt for x in ["fake", "falsa", "bot", "robô"]):
+                    audio_choice = "nao_sou_fake_nao"
+                elif CTAEngine().should_use_audio():
+                    audio_choice = resposta.get("audio")
+
+                if audio_choice and "audio" not in resposta:
+                    resposta["audio"] = audio_choice
                 
                 if resposta.get("cta", {}).get("show"):
                     if not CTAEngine().should_show_cta(st.session_state.messages):
@@ -873,8 +897,11 @@ class UiService:
             st.markdown("""
             <style>
                 [data-testid="stSidebar"] {
-                    background: linear-gradient(180deg, #1a0033 0%, #2d004d 100%) !important;
-                    border-right: 1px solid #ff66b3 !important;
+                    background:
+                        radial-gradient(900px 300px at 10% -10%, rgba(255,20,147,.25) 0%, transparent 60%),
+                        radial-gradient(700px 300px at 90% 110%, rgba(148,0,211,.25) 0%, transparent 60%),
+                        linear-gradient(180deg, #1a0033 0%, #2d004d 100%) !important;
+                    border-right: 2px solid #ff1493 !important;
                 }
                 .sidebar-profile {
                     text-align: center;
@@ -887,22 +914,34 @@ class UiService:
                     height: 100px;
                     object-fit: cover;
                     margin-bottom: 10px;
+                    box-shadow: 0 6px 18px rgba(255, 20, 147, 0.35);
                 }
                 .sidebar-social-button {
                     background: linear-gradient(45deg, #ff1493, #9400d3) !important;
                     color: white !important;
                     border: none !important;
-                    border-radius: 8px !important;
-                    padding: 10px 15px !important;
-                    margin: 5px 0 !important;
+                    border-radius: 10px !important;
+                    padding: 12px 16px !important;
+                    margin: 6px 0 !important;
                     width: 100% !important;
                     text-align: center !important;
-                    transition: all 0.3s ease !important;
+                    transition: all 0.25s ease !important;
+                    font-weight: 700;
+                    letter-spacing: .2px;
                 }
                 .sidebar-social-button:hover {
-                    transform: translateY(-2px) !important;
-                    box-shadow: 0 4px 8px rgba(255, 20, 147, 0.4) !important;
+                    transform: translateY(-2px) scale(1.01) !important;
+                    box-shadow: 0 6px 16px rgba(255, 20, 147, 0.45) !important;
                 }
+                .sidebar-menu-title{
+                    color:#ff7cc6; 
+                    font-weight:800; 
+                    margin: .5rem 0 .25rem 0;
+                    text-transform: uppercase;
+                    letter-spacing: .6px;
+                    font-size:.9em;
+                }
+                .hot-divider{border-top:1px solid rgba(255,102,179,.35); margin:.75rem 0;}
             </style>
             """, unsafe_allow_html=True)
             
@@ -914,21 +953,26 @@ class UiService:
             </div>
             """, unsafe_allow_html=True)
             
-            st.markdown("---")
-            
+            # Botão pra voltar ao chat
+            if st.button("💬 Chat", key="menu_chat", use_container_width=True):
+                st.session_state.current_page = "chat"
+                save_persistent_data()
+                st.rerun()
+
+            st.markdown('<div class="hot-divider"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="sidebar-menu-title">Redes Hot</div>', unsafe_allow_html=True)
             # Botões de redes sociais (estilo igual ao menu)
             for platform, url in Config.SOCIAL_LINKS.items():
                 if st.button(Config.SOCIAL_ICONS[platform], 
                            key=f"sidebar_{platform}",
                            use_container_width=True):
-                    # Abrir link em nova aba
                     js = f"window.open('{url}', '_blank');"
                     st.components.v1.html(f"<script>{js}</script>")
             
-            st.markdown("---")
-            
+            st.markdown('<div class="hot-divider"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="sidebar-menu-title">Navegação</div>', unsafe_allow_html=True)
             menu_options = {
-                "💋 Início": "home",
+                "🏠 Início": "home",
                 "📸 Preview": "gallery",
                 "🎁 Packs VIP": "offers"
             }
@@ -939,7 +983,7 @@ class UiService:
                     save_persistent_data()
                     st.rerun()
             
-            st.markdown("---")
+            st.markdown('<div class="hot-divider"></div>', unsafe_allow_html=True)
             st.markdown("""
             <div style="text-align: center; font-size: 0.7em; color: #888;">
                 <p>© 2024 Mylle Alves Premium</p>
@@ -983,14 +1027,14 @@ class UiService:
             st.session_state.current_page = "offers"
             st.rerun()
         
-        if st.button("💬 Voltar ao Chat", key="back_from_gallery"):
+        if st.button("💬 Voltar ao Chat", key="back_from_gallery", use_container_width=True):
             st.session_state.current_page = "chat"
             save_persistent_data()
             st.rerun()
 
     @staticmethod
     def chat_shortcuts() -> None:
-        cols = st.columns(3)
+        cols = st.columns(4)
         with cols[0]:
             if st.button("🏠 Início", key="shortcut_home", use_container_width=True):
                 st.session_state.current_page = "home"
@@ -1006,6 +1050,8 @@ class UiService:
                 st.session_state.current_page = "offers"
                 save_persistent_data()
                 st.rerun()
+        with cols[3]:
+            st.markdown("&nbsp;", unsafe_allow_html=True)
 
     @staticmethod
     def enhanced_chat_ui(conn: sqlite3.Connection) -> None:
@@ -1041,24 +1087,83 @@ class UiService:
 class NewPages:
     @staticmethod
     def show_home_page() -> None:
-        st.markdown("""
-        <div style="
-            background: linear-gradient(135deg, #1e0033, #3c0066);
-            padding: 50px 20px;
-            text-align: center;
-            border-radius: 15px;
-            color: white;
-            margin-bottom: 30px;
-            border: 2px solid #ff66b3;
-            box-shadow: 0 8px 25px rgba(255, 102, 179, 0.2);
-        ">
-            <h1 style="color: #ff66b3; margin-bottom: 10px;">Mylle Alves</h1>
-            <p style="font-size: 1.1em; opacity: 0.9;">Sua especialista em conteúdo adulto premium 🔥</p>
-            <p style="font-size: 0.9em; opacity: 0.7; margin-top: 10px;">Aqui eu comando - você obedece 😈</p>
-        </div>
-        """, unsafe_allow_html=True)
+        # Página inicial mais quente + correção do deprecation (use_container_width)
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            st.image(Config.IMG_PROFILE, use_container_width=True)
+            st.markdown("""
+            <div style="text-align: center; margin-top: 10px;">
+                <h3 style="color: #ff66b3;">Mylle Alves</h3>
+                <p style="color: #8be58b;">Online agora 💚</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("---")
+            
+            st.markdown("""
+            <div style="
+                background: rgba(255, 102, 179, 0.12);
+                padding: 15px;
+                border-radius: 10px;
+                border:1px solid rgba(255,102,179,0.25)
+            ">
+                <h4>📊 Meu Perfil</h4>
+                <p>👙 85-60-90</p>
+                <p>📏 1.68m</p>
+                <p>🎂 22 anos</p>
+                <p>📍 São Paulo</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown("""
+            <div style="
+                background: linear-gradient(45deg, #ff66b3, #ff1493);
+                padding: 20px;
+                border-radius: 10px;
+                color: white;
+                text-align: center;
+                margin-bottom: 20px;
+                box-shadow: 0 10px 22px rgba(255,20,147,.25);
+            ">
+                <h2>💋 Bem-vindo ao Meu Mundo</h2>
+                <p>Conversas quentes e conteúdo exclusivo esperando por você!</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("""
+            <div style="
+                background: rgba(255, 102, 179, 0.12);
+                padding: 20px;
+                border-radius: 10px;
+                margin-bottom: 20px;
+                border:1px solid rgba(255,102,179,.25);
+            ">
+                <h4>🎯 O que você encontra aqui:</h4>
+                <p>• 💬 Chat privado comigo</p>
+                <p>• 📸 Fotos exclusivas e sensuais</p>
+                <p>• 🎥 Vídeos quentes e explícitos</p>
+                <p>• 🎁 Conteúdo personalizado</p>
+                <p>• 🔞 Experiências únicas</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("### 🌶️ Prévia do Conteúdo")
+            preview_cols = st.columns(2)
+            previews = Config.IMG_HOME_PREVIEWS[:2]
+            for idx, col in enumerate(preview_cols):
+                with col:
+                    st.image(previews[idx], use_container_width=True)
+            # linha 2
+            preview_cols2 = st.columns(2)
+            previews2 = Config.IMG_HOME_PREVIEWS[2:4]
+            for idx, col in enumerate(preview_cols2):
+                with col:
+                    st.image(previews2[idx], use_container_width=True)
 
-        if st.button("💬 Iniciar Conversa com Mylle", use_container_width=True, type="primary"):
+        st.markdown("---")
+        if st.button("💬 Ir para o Chat", use_container_width=True, type="primary"):
             st.session_state.current_page = "chat"
             save_persistent_data()
             st.rerun()
@@ -1116,7 +1221,7 @@ class NewPages:
                     min-height: 480px;
                     position: relative;
                     transition: all 0.3s;
-                    box-shadow: 0 5px 15px rgba{package['color'].replace('#', '')}20;
+                    box-shadow: 0 5px 15px rgba(255, 20, 147, 0.18);
                 ">
                     <div style="text-align: center; margin-bottom: 15px;">
                         <img src="{package['image']}" style="
@@ -1163,7 +1268,7 @@ class NewPages:
         </div>
         """, unsafe_allow_html=True)
 
-        if st.button("💬 Voltar ao Chat", key="back_from_offers"):
+        if st.button("💬 Voltar ao Chat", key="back_from_offers", use_container_width=True):
             st.session_state.current_page = "chat"
             save_persistent_data()
             st.rerun()
@@ -1200,7 +1305,8 @@ class ChatService:
 
         # Iniciar conversa automaticamente se for novo usuário
         if len(st.session_state.messages) == 0 and st.session_state.chat_started:
-            # Simular digitação na primeira mensagem
+            # Esperar a página carregar + 5s antes de iniciar a simulação
+            time.sleep(5)
             typing_container = st.empty()
             typing_container.markdown("""
             <div style="
@@ -1231,6 +1337,7 @@ class ChatService:
                 "role": "assistant",
                 "content": json.dumps({
                     "text": random.choice(opening_messages),
+                    "audio": "oi_meu_amor_tudo_bem",
                     "cta": {"show": False}
                 })
             }
@@ -1242,7 +1349,8 @@ class ChatService:
                 st.session_state.session_id,
                 "assistant",
                 json.dumps({
-                    "text": initial_message["content"],
+                    "text": json.loads(initial_message["content"])["text"],
+                    "audio": "oi_meu_amor_tudo_bem",
                     "cta": {"show": False}
                 })
             )
@@ -1360,7 +1468,7 @@ class ChatService:
                     "role": "assistant", 
                     "content": json.dumps({
                         "text": "Ei, sumido! Tô esperando sua resposta... 😘",
-                        "audio": "esperando_responder",
+                        "audio": "vida_to_esperando_voce_me_responder_gatinho",
                         "cta": {"show": False}
                     })
                 }
