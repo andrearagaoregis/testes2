@@ -118,7 +118,7 @@ class Config:
     API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={API_KEY}"
     CHECKOUT_TARADINHA = "https://app.pushinpay.com.br/#/service/pay/9FACC74F-01EC-4770-B182-B5775AF62A1D"
     CHECKOUT_MOLHADINHA = "https://app.pushinpay.com.br/#/service/pay/9FACD1E6-0EFD-4E3E-9F9D-BA0C1A2D7E7A"
-    CHECKOUT_SAFADINHA = "https://app.pushinpay.com.br/#/service/pay/9FACD395-EE65-458E-9B7E-FED750CC9CA9"
+    CHECKOUT_SAFADINHA = "https://app.pushinpay.com.br/#/service/pay/9FACD395-EE65-458E-9F7E-FED750CC9CA9"
     MAX_REQUESTS_PER_SESSION = 100
     REQUEST_TIMEOUT = 30
     IMG_PROFILE = "https://i.ibb.co/bMynqzMh/BY-Admiregirls-su-Admiregirls-su-156.jpg"
@@ -169,6 +169,14 @@ class Config:
         "boa_tarde_nao_sou_fake": "https://github.com/andrearagaoregis/MylleAlves/raw/refs/heads/main/assets/Boa%20tarde%20-%20N%C3%A3o%20sou%20fake%20n%C3%A3o....mp3",
         "bom_dia_nao_sou_fake": "https://github.com/andrearagaoregis/MylleAlves/raw/refs/heads/main/assets/Bom%20dia%20-%20n%C3%A3o%20sou%20fake%20n%C3%A3o....mp3"
     }
+    
+    # Palavras-chave para detecção de dúvidas sobre autenticidade
+    FAKE_DETECTION_KEYWORDS = [
+        "fake", "falsa", "bot", "robô", "artificial", "não é real", "é mentira",
+        "duvido", "vc é real", "é você mesmo", "verdadeira", "autêntica",
+        "pessoa real", "de verdade", "não acredito", "mentira", "farsa",
+        "enganando", "não existe", "inventada", "fingindo", "simulada"
+    ]
 
 # ======================
 # APRENDIZADO DE MÁQUINA
@@ -512,7 +520,7 @@ class CTAEngine:
         user_input = user_input.lower()
         
         # Verificar se o usuário desconfia que é fake/bot
-        if any(word in user_input for word in ["fake", "falsa", "bot", "robô", "artificial", "não é real", "é mentira"]):
+        if any(word in user_input for word in Config.FAKE_DETECTION_KEYWORDS):
             # Selecionar áudio genérico de fake
             return {
                 "text": "Não sou fake não, amor! Ouça minha voz... 😘",
@@ -653,6 +661,15 @@ class ApiService:
 
     @staticmethod
     def _call_gemini_api(prompt: str, session_id: str, conn: sqlite3.Connection) -> Dict:
+        # Verificar primeiro se é uma dúvida sobre autenticidade
+        lower_prompt = prompt.lower()
+        if any(keyword in lower_prompt for keyword in Config.FAKE_DETECTION_KEYWORDS):
+            return {
+                "text": "Não sou fake não, amor! Ouça minha voz... 😘",
+                "audio": "nao_sou_fake_nao",
+                "cta": {"show": False}
+            }
+        
         # Calcular tempo de resposta baseado no tamanho do texto (0.5 segundo por caractere, mínimo 10s)
         response_delay = max(10, len(prompt) * 0.5)
         time.sleep(min(response_delay, 20))  # Máximo de 20 segundos
@@ -698,7 +715,6 @@ class ApiService:
                     resposta = json.loads(gemini_response)
                 
                 # Decidir se deve usar áudio (15% das vezes) ou baseado em gatilho
-                lower_prompt = prompt.lower()
                 audio_choice = None
                 if any(x in lower_prompt for x in ["amostra", "amostras", "grátis", "gratis", "sample", "free"]):
                     audio_choice = "claro_tenho_amostra_gratis"
@@ -710,7 +726,7 @@ class ApiService:
                     audio_choice = "imagina_ela_bem_rosinha"
                 elif any(x in lower_prompt for x in ["chamada", "videochamada", "ligação", "call"]):
                     audio_choice = "pq_nao_faco_chamada"
-                elif any(x in lower_prompt for x in ["fake", "falsa", "bot", "robô"]):
+                elif any(x in lower_prompt for x in Config.FAKE_DETECTION_KEYWORDS):
                     audio_choice = "nao_sou_fake_nao"
                 elif CTAEngine().should_use_audio():
                     audio_choice = resposta.get("audio")
@@ -718,8 +734,13 @@ class ApiService:
                 if audio_choice and "audio" not in resposta:
                     resposta["audio"] = audio_choice
                 
+                # Garantir que apenas botões válidos sejam exibidos
                 if resposta.get("cta", {}).get("show"):
-                    if not CTAEngine().should_show_cta(st.session_state.messages):
+                    cta_target = resposta["cta"].get("target", "")
+                    # Permitir apenas targets específicos para evitar erros
+                    if cta_target not in ["offers", "gallery"]:
+                        resposta["cta"]["show"] = False
+                    elif not CTAEngine().should_show_cta(st.session_state.messages):
                         resposta["cta"]["show"] = False
                     else:
                         st.session_state.last_cta_time = time.time()
@@ -888,6 +909,7 @@ class UiService:
                         use_container_width=True,
                         type="primary"):
                 st.session_state.age_verified = True
+                st.session_state.current_page = "home"  # Redirecionar para a página inicial
                 save_persistent_data()
                 st.rerun()
 
@@ -1163,10 +1185,17 @@ class NewPages:
                     st.image(previews2[idx], use_container_width=True)
 
         st.markdown("---")
-        if st.button("💬 Ir para o Chat", use_container_width=True, type="primary"):
-            st.session_state.current_page = "chat"
-            save_persistent_data()
-            st.rerun()
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💬 Ir para o Chat", use_container_width=True, type="primary"):
+                st.session_state.current_page = "chat"
+                save_persistent_data()
+                st.rerun()
+        with col2:
+            if st.button("🎁 Ver Packs VIP", use_container_width=True):
+                st.session_state.current_page = "offers"
+                save_persistent_data()
+                st.rerun()
 
     @staticmethod
     def show_offers_page() -> None:
@@ -1285,7 +1314,7 @@ class ChatService:
             'age_verified': False,
             'connection_complete': False,
             'chat_started': False,
-            'current_page': 'home',
+            'current_page': 'home',  # Inicia na página home após verificação de idade
             'last_cta_time': 0,
             'preview_shown': False,
             'session_id': str(random.randint(100000, 999999)),
@@ -1527,8 +1556,16 @@ class ChatService:
                 """, unsafe_allow_html=True)
             
             with st.chat_message("assistant", avatar=Config.IMG_PROFILE):
-                # Simular digitação (0.5 segundo por caractere, mínimo 10s)
-                resposta = ApiService.ask_gemini(cleaned_input, st.session_state.session_id, conn)
+                # Verificar se é uma dúvida sobre autenticidade antes de chamar a API
+                lower_input = cleaned_input.lower()
+                if any(keyword in lower_input for keyword in Config.FAKE_DETECTION_KEYWORDS):
+                    resposta = {
+                        "text": "Não sou fake não, amor! Ouça minha voz... 😘",
+                        "audio": "nao_sou_fake_nao",
+                        "cta": {"show": False}
+                    }
+                else:
+                    resposta = ApiService.ask_gemini(cleaned_input, st.session_state.session_id, conn)
                 
                 if isinstance(resposta, str):
                     resposta = {"text": resposta, "cta": {"show": False}}
