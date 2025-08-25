@@ -9,11 +9,12 @@ import random
 import sqlite3
 import re
 import uuid
+import logging
 from datetime import datetime
 from functools import lru_cache
 from typing import Dict, List, Optional
-import threading
 from collections import defaultdict
+from hashlib import md5
 
 # ======================
 # CONFIGURAÇÃO INICIAL
@@ -24,6 +25,17 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Configurar logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Estilos CSS
 hide_streamlit_style = """
@@ -106,6 +118,30 @@ hide_streamlit_style = """
         font-size: 24px !important;
         margin-right: 10px !important;
     }
+    
+    /* Melhorias responsivas e de acessibilidade */
+    @media (max-width: 768px) {
+        .stButton > button {
+            padding: 12px 8px;
+            font-size: 14px;
+        }
+        .stChatMessage {
+            padding: 8px !important;
+            margin: 5px 0 !important;
+        }
+        .audio-message {
+            padding: 10px !important;
+        }
+    }
+    
+    .stButton > button:focus {
+        outline: 2px solid #ff66b3;
+        outline-offset: 2px;
+    }
+    
+    .stChatMessage {
+        transition: all 0.3s ease;
+    }
 </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -133,7 +169,6 @@ class Config:
         "https://i.ibb.co/Q7s9Zwcr/BY-Admiregirls-su-Admiregirls-su-183.jpg",
         "https://i.ibb.co/0jRMxrFB/BY-Admiregirls-su-Admiregirls-su-271.jpg"
     ]
-    # Prévias usadas na Home (corrige aviso de parâmetro deprecado)
     IMG_HOME_PREVIEWS = [
         "https://i.ibb.co/5Gfw3hQ/home-prev-1.jpg",
         "https://i.ibb.co/vkXch6N/home-prev-2.jpg",
@@ -153,7 +188,7 @@ class Config:
         "twitter": "🐦 Twitter"
     }
     
-    # Áudios (atualizados + novos)
+    # Áudios
     AUDIOS = {
         "claro_tenho_amostra_gratis": "https://github.com/andrearagaoregis/testes2/raw/refs/heads/main/assets/Claro%20eu%20tenho%20amostra%20gr%C3%A1tis.mp3",
         "imagina_ela_bem_rosinha": "https://github.com/andrearagaoregis/testes2/raw/refs/heads/main/assets/Imagina%20s%C3%B3%20ela%20bem%20rosinha.mp3",
@@ -164,22 +199,104 @@ class Config:
         "eu_tenho_uns_conteudos_que_vai_amar": "https://github.com/andrearagaoregis/testes2/raw/refs/heads/main/assets/eu%20tenho%20uns%20conteudos%20aqui%20que%20vc%20vai%20amar.mp3",
         "nao_sou_fake_nao": "https://github.com/andrearagaoregis/testes2/raw/refs/heads/main/assets/nao%20sou%20fake%20nao.mp3",
         "vida_to_esperando_voce_me_responder_gatinho": "https://github.com/andrearagaoregis/testes2/raw/refs/heads/main/assets/vida%20to%20esperando%20voce%20me%20responder%20gatinho.mp3",
-        # versões antigas (mantidas para compatibilidade)
         "boa_noite_nao_sou_fake": "https://github.com/andrearagaoregis/MylleAlves/raw/refs/heads/main/assets/Boa%20noite%20-%20N%C3%A3o%20sou%20fake%20n%C3%A3o....mp3",
         "boa_tarde_nao_sou_fake": "https://github.com/andrearagaoregis/MylleAlves/raw/refs/heads/main/assets/Boa%20tarde%20-%20N%C3%A3o%20sou%20fake%20n%C3%A3o....mp3",
         "bom_dia_nao_sou_fake": "https://github.com/andrearagaoregis/MylleAlves/raw/refs/heads/main/assets/Bom%20dia%20-%20n%C3%A3o%20sou%20fake%20n%C3%A3o....mp3"
     }
     
-    # Palavras-chave para detecção de dúvidas sobre autenticidade
-    FAKE_DETECTION_KEYWORDS = [
-        "fake", "falsa", "bot", "robô", "artificial", "não é real", "é mentira",
-        "duvido", "vc é real", "é você mesmo", "verdadeira", "autêntica",
-        "pessoa real", "de verdade", "não acredito", "mentira", "farsa",
-        "enganando", "não existe", "inventada", "fingindo", "simulada"
+    # Padrões de detecção de fake com pontuação
+    FAKE_DETECTION_PATTERNS = [
+        (["fake", "falsa", "bot", "robô"], 0.8),
+        (["não", "é", "real"], 0.7),
+        (["é", "você", "mesmo"], 0.9),
+        (["vc", "é", "real"], 0.9),
+        (["duvido", "que", "seja"], 0.8),
+        (["mentira", "farsa"], 0.7),
+        (["verdadeira", "autêntica"], -0.5),
+        (["pessoa", "de", "verdade"], 0.6),
+        (["não", "acredito"], 0.5),
+        (["programa", "automático"], 0.7),
     ]
 
 # ======================
-# APRENDIZADO DE MÁQUINA
+# FUNÇÕES AUXILIARES
+# ======================
+def detect_fake_question(text: str) -> float:
+    """Detecta se o texto contém dúvidas sobre autenticidade com pontuação"""
+    text = text.lower()
+    words = re.findall(r'\w+', text)
+    probability = 0
+    
+    for pattern, score in Config.FAKE_DETECTION_PATTERNS:
+        if all(word in words for word in pattern):
+            probability += score
+    
+    # Aumentar probabilidade se houver múltiplos indicadores
+    indicator_count = sum(1 for pattern, _ in Config.FAKE_DETECTION_PATTERNS 
+                         if any(word in words for word in pattern))
+    
+    if indicator_count > 1:
+        probability += 0.2 * (indicator_count - 1)
+    
+    return min(1.0, max(0, probability))
+
+def generate_conversation_hash(messages: List[Dict], current_input: str) -> str:
+    """Gera hash único baseado no histórico e input atual"""
+    relevant_history = "".join([msg["content"] for msg in messages[-4:]])
+    content = relevant_history + current_input
+    return md5(content.encode()).hexdigest()
+
+def get_fallback_response(user_input: str, conversation_history: List[Dict]) -> Dict:
+    """Gera resposta de fallback contextualizada"""
+    lower_input = user_input.lower()
+    
+    # Respostas contextuais baseadas no histórico
+    last_assistant_msg = None
+    for msg in reversed(conversation_history):
+        if msg["role"] == "assistant":
+            last_assistant_msg = msg["content"]
+            break
+    
+    # Se a última mensagem foi sobre packs
+    if last_assistant_msg and any(word in last_assistant_msg.lower() for word in ["pack", "conteúdo", "valor"]):
+        return {
+            "text": "Estou com problemas técnicos agora, amor 😔 Mas você pode ver meus packs clicando no botão abaixo!",
+            "cta": {"show": True, "label": "📦 Ver Packs", "target": "offers"}
+        }
+    
+    # Resposta padrão
+    return {
+        "text": "Estou com uma conexão instável agora, gato 😕 Me manda de novo o que você quer?",
+        "cta": {"show": False}
+    }
+
+def adjust_rate_limiting(user_id: str, current_count: int) -> bool:
+    """Define limites dinâmicos baseados no engajamento"""
+    try:
+        conn = sqlite3.connect('learning_data.db')
+        c = conn.cursor()
+        
+        # Verificar histórico do usuário
+        c.execute('''SELECT COUNT(*) FROM conversations 
+                     WHERE user_id = ? AND role = "user" AND date(timestamp) = date('now')''',
+                  (user_id,))
+        daily_count = c.fetchone()[0]
+        
+        # Usuários engajados têm limites maiores
+        if daily_count > 20:  # Usuário frequente
+            max_requests = 150
+        elif daily_count > 5:  # Usuário regular
+            max_requests = 100
+        else:  # Novo usuário
+            max_requests = 50
+        
+        conn.close()
+        return current_count < max_requests
+    except:
+        return current_count < Config.MAX_REQUESTS_PER_SESSION
+
+# ======================
+# APRENDIZADO DE MÁQUINA (mantido igual)
 # ======================
 class LearningEngine:
     def __init__(self):
@@ -192,23 +309,20 @@ class LearningEngine:
             conn = sqlite3.connect('learning_data.db')
             c = conn.cursor()
             
-            # Tabela de preferências
             c.execute('''CREATE TABLE IF NOT EXISTS user_preferences
                         (user_id TEXT, preference_type TEXT, preference_value TEXT, strength REAL,
                          PRIMARY KEY (user_id, preference_type))''')
             
-            # Tabela de padrões de conversa
             c.execute('''CREATE TABLE IF NOT EXISTS conversation_patterns
                         (pattern_type TEXT, pattern_text TEXT, success_rate REAL, usage_count INTEGER)''')
             
-            # Tabela de informações do lead
             c.execute('''CREATE TABLE IF NOT EXISTS lead_info
                         (user_id TEXT PRIMARY KEY, name TEXT, location TEXT, created_at DATETIME)''')
             
             conn.commit()
             conn.close()
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Error loading learning data: {e}")
     
     def save_user_preference(self, user_id: str, preference_type: str, preference_value: str, strength: float = 1.0):
         try:
@@ -220,8 +334,8 @@ class LearningEngine:
                      (user_id, preference_type, preference_value, strength))
             conn.commit()
             conn.close()
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Error saving user preference: {e}")
     
     def get_user_preferences(self, user_id: str) -> Dict:
         preferences = {}
@@ -235,8 +349,8 @@ class LearningEngine:
                     preferences[row[0]] = {}
                 preferences[row[0]][row[1]] = row[2]
             conn.close()
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Error getting user preferences: {e}")
         return preferences
     
     def save_lead_info(self, user_id: str, name: str = None, location: str = None):
@@ -244,7 +358,6 @@ class LearningEngine:
             conn = sqlite3.connect('learning_data.db')
             c = conn.cursor()
             
-            # Verificar se já existe
             c.execute('SELECT * FROM lead_info WHERE user_id = ?', (user_id,))
             if c.fetchone():
                 if name:
@@ -257,8 +370,8 @@ class LearningEngine:
             
             conn.commit()
             conn.close()
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Error saving lead info: {e}")
     
     def get_lead_info(self, user_id: str) -> Dict:
         try:
@@ -270,8 +383,8 @@ class LearningEngine:
             
             if result:
                 return {"name": result[0], "location": result[1]}
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Error getting lead info: {e}")
         return {"name": None, "location": None}
     
     def analyze_conversation_pattern(self, messages: List[Dict]) -> None:
@@ -331,11 +444,11 @@ class LearningEngine:
                             topic, 
                             user_text.lower().count(keyword) * 0.1
                         )
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Error analyzing conversation pattern: {e}")
 
 # ======================
-# PERSISTÊNCIA DE ESTADO
+# PERSISTÊNCIA DE ESTADO (com melhorias)
 # ======================
 class PersistentState:
     _instance = None
@@ -405,11 +518,19 @@ def save_persistent_data() -> None:
         'user_info_collected', 'last_user_message_time', 'audio_count'
     ]
     
-    new_data = {key: st.session_state.get(key) for key in persistent_keys if key in st.session_state}
-    db.save_state(user_id, new_data)
+    # Apenas salvar dados que realmente mudaram
+    current_state = {key: st.session_state.get(key) for key in persistent_keys if key in st.session_state}
+    last_saved_state = db.load_state(user_id) or {}
+    
+    # Verificar se houve mudanças significativas
+    changed_keys = [key for key in persistent_keys 
+                   if current_state.get(key) != last_saved_state.get(key)]
+    
+    if changed_keys:
+        db.save_state(user_id, current_state)
 
 # ======================
-# MODELOS DE DADOS
+# MODELOS DE DADOS (mantido igual)
 # ======================
 class Persona:
     MYLLE = """
@@ -455,8 +576,13 @@ class Persona:
 class CTAEngine:
     def __init__(self):
         self.learning_engine = LearningEngine()
+        self.cta_priority = {
+            "offers": 3,    # Alta prioridade (venda)
+            "gallery": 2,   # Média prioridade (engajamento)
+            "social": 1     # Baixa prioridade (redes sociais)
+        }
     
-    def should_show_cta(self, conversation_history: List[Dict]) -> bool:
+    def should_show_cta(self, conversation_history: List[Dict], cta_type: str = "offers") -> bool:
         if len(conversation_history) < 3:
             return False
 
@@ -464,6 +590,12 @@ class CTAEngine:
             elapsed = time.time() - st.session_state.last_cta_time
             if elapsed < 120:
                 return False
+
+        # Verificação de prioridade
+        priority = self.cta_priority.get(cta_type, 2)
+        min_messages = 2 if priority >= 3 else 4
+        if len(conversation_history) < min_messages:
+            return False
 
         last_msgs = []
         for msg in conversation_history[-6:]:
@@ -509,7 +641,6 @@ class CTAEngine:
         return False
 
     def should_use_audio(self) -> bool:
-        # Usar áudio em aproximadamente 15% das respostas
         if 'audio_count' not in st.session_state:
             st.session_state.audio_count = 0
             
@@ -520,8 +651,8 @@ class CTAEngine:
         user_input = user_input.lower()
         
         # Verificar se o usuário desconfia que é fake/bot
-        if any(word in user_input for word in Config.FAKE_DETECTION_KEYWORDS):
-            # Selecionar áudio genérico de fake
+        fake_probability = detect_fake_question(user_input)
+        if fake_probability > 0.6:
             return {
                 "text": "Não sou fake não, amor! Ouça minha voz... 😘",
                 "audio": "nao_sou_fake_nao",
@@ -607,7 +738,7 @@ class CTAEngine:
             }
 
 # ======================
-# SERVIÇOS DE BANCO DE DADOS
+# SERVIÇOS DE BANCO DE DADOS (com melhorias)
 # ======================
 class DatabaseService:
     @staticmethod
@@ -634,20 +765,39 @@ class DatabaseService:
             """, (user_id, session_id, datetime.now(), role, content))
             conn.commit()
         except sqlite3.Error as e:
-            st.error(f"Erro ao salvar mensagem: {e}")
+            logger.error(f"Erro ao salvar mensagem: {e}")
 
     @staticmethod
-    def load_messages(conn: sqlite3.Connection, user_id: str, session_id: str) -> List[Dict]:
-        c = conn.cursor()
-        c.execute("""
-            SELECT role, content FROM conversations 
-            WHERE user_id = ? AND session_id = ?
-            ORDER BY timestamp
-        """, (user_id, session_id))
-        return [{"role": row[0], "content": row[1]} for row in c.fetchall()]
+    def load_messages(conn: sqlite3.Connection, user_id: str, session_id: str, limit: int = 50) -> List[Dict]:
+        try:
+            c = conn.cursor()
+            c.execute("""
+                SELECT role, content FROM conversations 
+                WHERE user_id = ? AND session_id = ?
+                ORDER BY timestamp DESC
+                LIMIT ?
+            """, (user_id, session_id, limit))
+            return [{"role": row[0], "content": row[1]} for row in reversed(c.fetchall())]
+        except sqlite3.Error as e:
+            logger.error(f"Erro ao carregar mensagens: {e}")
+            return []
+
+    @staticmethod
+    def cleanup_old_messages(conn: sqlite3.Connection, days: int = 7):
+        """Limpa mensagens antigas do banco de dados"""
+        try:
+            c = conn.cursor()
+            c.execute("""
+                DELETE FROM conversations 
+                WHERE timestamp < datetime('now', ?)
+            """, (f'-{days} days',))
+            conn.commit()
+            logger.info(f"Cleaned up messages older than {days} days")
+        except sqlite3.Error as e:
+            logger.error(f"Erro ao limpar mensagens antigas: {e}")
 
 # ======================
-# SERVIÇOS DE API
+# SERVIÇOS DE API (com melhorias)
 # ======================
 class ApiService:
     def __init__(self):
@@ -655,24 +805,24 @@ class ApiService:
         self.learning_engine = LearningEngine()
     
     @staticmethod
-    @lru_cache(maxsize=100)
-    def ask_gemini(prompt: str, session_id: str, conn: sqlite3.Connection) -> Dict:
+    @lru_cache(maxsize=200)
+    def ask_gemini_cached(conversation_hash: str, prompt: str, session_id: str, conn: sqlite3.Connection) -> Dict:
         return ApiService._call_gemini_api(prompt, session_id, conn)
 
     @staticmethod
     def _call_gemini_api(prompt: str, session_id: str, conn: sqlite3.Connection) -> Dict:
         # Verificar primeiro se é uma dúvida sobre autenticidade
-        lower_prompt = prompt.lower()
-        if any(keyword in lower_prompt for keyword in Config.FAKE_DETECTION_KEYWORDS):
+        fake_probability = detect_fake_question(prompt)
+        if fake_probability > 0.7:
             return {
                 "text": "Não sou fake não, amor! Ouça minha voz... 😘",
                 "audio": "nao_sou_fake_nao",
                 "cta": {"show": False}
             }
         
-        # Calcular tempo de resposta baseado no tamanho do texto (0.5 segundo por caractere, mínimo 10s)
+        # Calcular tempo de resposta baseado no tamanho do texto
         response_delay = max(10, len(prompt) * 0.5)
-        time.sleep(min(response_delay, 20))  # Máximo de 20 segundos
+        time.sleep(min(response_delay, 20))
         
         status_container = st.empty()
         UiService.show_status_effect(status_container, "viewed")
@@ -704,6 +854,7 @@ class ApiService:
         }
         
         try:
+            logger.info(f"API call for session {session_id}: {prompt[:50]}...")
             response = requests.post(Config.API_URL, headers=headers, json=data, timeout=Config.REQUEST_TIMEOUT)
             response.raise_for_status()
             gemini_response = response.json().get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
@@ -714,7 +865,8 @@ class ApiService:
                 else:
                     resposta = json.loads(gemini_response)
                 
-                # Decidir se deve usar áudio (15% das vezes) ou baseado em gatilho
+                # Decidir se deve usar áudio
+                lower_prompt = prompt.lower()
                 audio_choice = None
                 if any(x in lower_prompt for x in ["amostra", "amostras", "grátis", "gratis", "sample", "free"]):
                     audio_choice = "claro_tenho_amostra_gratis"
@@ -726,7 +878,7 @@ class ApiService:
                     audio_choice = "imagina_ela_bem_rosinha"
                 elif any(x in lower_prompt for x in ["chamada", "videochamada", "ligação", "call"]):
                     audio_choice = "pq_nao_faco_chamada"
-                elif any(x in lower_prompt for x in Config.FAKE_DETECTION_KEYWORDS):
+                elif fake_probability > 0.5:
                     audio_choice = "nao_sou_fake_nao"
                 elif CTAEngine().should_use_audio():
                     audio_choice = resposta.get("audio")
@@ -737,10 +889,12 @@ class ApiService:
                 # Garantir que apenas botões válidos sejam exibidos
                 if resposta.get("cta", {}).get("show"):
                     cta_target = resposta["cta"].get("target", "")
+                    cta_type = "offers" if cta_target == "offers" else "gallery" if cta_target == "gallery" else "social"
+                    
                     # Permitir apenas targets específicos para evitar erros
                     if cta_target not in ["offers", "gallery"]:
                         resposta["cta"]["show"] = False
-                    elif not CTAEngine().should_show_cta(st.session_state.messages):
+                    elif not CTAEngine().should_show_cta(st.session_state.messages, cta_type):
                         resposta["cta"]["show"] = False
                     else:
                         st.session_state.last_cta_time = time.time()
@@ -748,22 +902,22 @@ class ApiService:
                 return resposta
             
             except json.JSONDecodeError:
+                logger.warning("JSON decode error, returning plain text")
                 return {"text": gemini_response, "cta": {"show": False}}
                 
         except requests.exceptions.RequestException as e:
-            st.error(f"Erro de conexão: {str(e)}")
-            return CTAEngine().generate_response_based_on_learning(prompt, get_user_id())
+            logger.error(f"Erro de conexão: {str(e)}")
+            return get_fallback_response(prompt, st.session_state.messages)
         except Exception as e:
-            st.error(f"Erro inesperado: {str(e)}")
-            return CTAEngine().generate_response_based_on_learning(prompt, get_user_id())
+            logger.error(f"Erro inesperado: {str(e)}")
+            return get_fallback_response(prompt, st.session_state.messages)
 
 # ======================
-# SERVIÇOS DE INTERFACE
+# SERVIÇOS DE INTERFACE (com melhorias)
 # ======================
 class UiService:
     @staticmethod
     def show_audio_player(audio_key: str) -> None:
-        """Exibe um player de áudio para a chave especificada"""
         if audio_key in Config.AUDIOS:
             st.markdown(f"""
             <div class="audio-message">
@@ -902,23 +1056,36 @@ class UiService:
         </div>
         """, unsafe_allow_html=True)
 
-        col1, col2, col3 = st.columns([1,2,1])
+        col1, col2, col3 = st.columns([1,3,1])
         with col2:
-            if st.button("🔥 Tenho 18 anos ou mais", 
-                        key="age_checkbox",
-                        use_container_width=True,
-                        type="primary"):
-                st.session_state.age_verified = True
-                st.session_state.current_page = "home"  # Redirecionar para a página inicial
-                save_persistent_data()
-                st.rerun()
+            st.markdown("""
+            <div style="text-align: center; margin-top: 20px;">
+                <p style="color: #aaa;">O que você gostaria de fazer agora?</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                if st.button("🏠 Conhecer a Mylle", use_container_width=True):
+                    st.session_state.age_verified = True
+                    st.session_state.current_page = "home"
+                    save_persistent_data()
+                    st.rerun()
+            
+            with col_btn2:
+                if st.button("💬 Conversar Agora", use_container_width=True, type="primary"):
+                    st.session_state.age_verified = True
+                    st.session_state.current_page = "chat"
+                    st.session_state.chat_started = True
+                    save_persistent_data()
+                    st.rerun()
 
     @staticmethod
     def setup_sidebar() -> None:
         with st.sidebar:
             st.markdown("""
             <style>
-                [data-testid="stSidebar"] {
+                [data.testid="stSidebar"] {
                     background:
                         radial-gradient(900px 300px at 10% -10%, rgba(255,20,147,.25) 0%, transparent 60%),
                         radial-gradient(700px 300px at 90% 110%, rgba(148,0,211,.25) 0%, transparent 60%),
@@ -975,7 +1142,6 @@ class UiService:
             </div>
             """, unsafe_allow_html=True)
             
-            # Botão pra voltar ao chat
             if st.button("💬 Chat", key="menu_chat", use_container_width=True):
                 st.session_state.current_page = "chat"
                 save_persistent_data()
@@ -983,7 +1149,7 @@ class UiService:
 
             st.markdown('<div class="hot-divider"></div>', unsafe_allow_html=True)
             st.markdown('<div class="sidebar-menu-title">Redes Hot</div>', unsafe_allow_html=True)
-            # Botões de redes sociais (estilo igual ao menu)
+            
             for platform, url in Config.SOCIAL_LINKS.items():
                 if st.button(Config.SOCIAL_ICONS[platform], 
                            key=f"sidebar_{platform}",
@@ -993,6 +1159,7 @@ class UiService:
             
             st.markdown('<div class="hot-divider"></div>', unsafe_allow_html=True)
             st.markdown('<div class="sidebar-menu-title">Navegação</div>', unsafe_allow_html=True)
+            
             menu_options = {
                 "🏠 Início": "home",
                 "📸 Preview": "gallery",
@@ -1104,12 +1271,11 @@ class UiService:
         save_persistent_data()
 
 # ======================
-# PÁGINAS
+# PÁGINAS (com melhorias)
 # ======================
 class NewPages:
     @staticmethod
     def show_home_page() -> None:
-        # Página inicial mais quente + correção do deprecation (use_container_width)
         col1, col2 = st.columns([1, 2])
         
         with col1:
@@ -1177,7 +1343,7 @@ class NewPages:
             for idx, col in enumerate(preview_cols):
                 with col:
                     st.image(previews[idx], use_container_width=True)
-            # linha 2
+            
             preview_cols2 = st.columns(2)
             previews2 = Config.IMG_HOME_PREVIEWS[2:4]
             for idx, col in enumerate(preview_cols2):
@@ -1189,6 +1355,7 @@ class NewPages:
         with col1:
             if st.button("💬 Ir para o Chat", use_container_width=True, type="primary"):
                 st.session_state.current_page = "chat"
+                st.session_state.chat_started = True
                 save_persistent_data()
                 st.rerun()
         with col2:
@@ -1303,7 +1470,7 @@ class NewPages:
             st.rerun()
 
 # ======================
-# SERVIÇOS DE CHAT
+# SERVIÇOS DE CHAT (com melhorias)
 # ======================
 class ChatService:
     @staticmethod
@@ -1314,7 +1481,7 @@ class ChatService:
             'age_verified': False,
             'connection_complete': False,
             'chat_started': False,
-            'current_page': 'home',  # Inicia na página home após verificação de idade
+            'current_page': 'home',
             'last_cta_time': 0,
             'preview_shown': False,
             'session_id': str(random.randint(100000, 999999)),
@@ -1332,10 +1499,14 @@ class ChatService:
             if key not in st.session_state:
                 st.session_state[key] = default
 
+        # Limpeza periódica de mensagens antigas (apenas uma vez por sessão)
+        if 'cleanup_done' not in st.session_state:
+            DatabaseService.cleanup_old_messages(conn, days=7)
+            st.session_state.cleanup_done = True
+
         # Iniciar conversa automaticamente se for novo usuário
         if len(st.session_state.messages) == 0 and st.session_state.chat_started:
-            # Esperar a página carregar + 5s antes de iniciar a simulação
-            time.sleep(5)
+            time.sleep(3)
             typing_container = st.empty()
             typing_container.markdown("""
             <div style="
@@ -1435,7 +1606,6 @@ class ChatService:
                                 </div>
                                 """, unsafe_allow_html=True)
                                 
-                                # Mostrar áudio se existir
                                 if content_data.get("audio"):
                                     UiService.show_audio_player(content_data["audio"])
                                 
@@ -1464,15 +1634,12 @@ class ChatService:
 
     @staticmethod
     def check_inactive_user() -> bool:
-        """Verifica se o usuário está inativo e envia mensagem de follow-up"""
         if 'last_user_message_time' not in st.session_state:
             st.session_state.last_user_message_time = time.time()
             return False
             
         inactive_time = time.time() - st.session_state.last_user_message_time
-        # Se passaram mais de 2 minutos sem resposta do usuário
         if inactive_time > 120 and len(st.session_state.messages) > 2:
-            # 30% de chance de enviar follow-up
             if random.random() < 0.3:
                 return True
         return False
@@ -1481,10 +1648,8 @@ class ChatService:
     def process_user_input(conn: sqlite3.Connection) -> None:
         ChatService.display_chat_history()
         
-        # Verificar se usuário está inativo
         if ChatService.check_inactive_user():
-            # Enviar mensagem de follow-up (alternando entre texto e áudio)
-            if random.random() < 0.5:  # 50% texto, 50% áudio
+            if random.random() < 0.5:
                 follow_up_message = {
                     "role": "assistant",
                     "content": json.dumps({
@@ -1510,7 +1675,7 @@ class ChatService:
                 "assistant",
                 follow_up_message["content"]
             )
-            st.session_state.last_user_message_time = time.time()  # Reset timer
+            st.session_state.last_user_message_time = time.time()
             save_persistent_data()
             st.rerun()
         
@@ -1519,7 +1684,8 @@ class ChatService:
         if user_input:
             cleaned_input = re.sub(r'<[^>]*>', '', user_input)[:500]
             
-            if st.session_state.request_count >= Config.MAX_REQUESTS_PER_SESSION:
+            # Verificar limite de requisições com sistema adaptativo
+            if not adjust_rate_limiting(get_user_id(), st.session_state.request_count):
                 st.session_state.messages.append({"role": "assistant", "content": json.dumps({
                     "text": "Por hoje chega, gato 😘 Volto amanhã com mais safadeza pra você!",
                     "cta": {"show": False}
@@ -1540,7 +1706,7 @@ class ChatService:
             DatabaseService.save_message(conn, get_user_id(), st.session_state.session_id, "user", cleaned_input)
             st.session_state.request_count += 1
             st.session_state.last_interaction_time = time.time()
-            st.session_state.last_user_message_time = time.time()  # Atualizar tempo da última mensagem
+            st.session_state.last_user_message_time = time.time()
             
             with st.chat_message("user", avatar="😎"):
                 st.markdown(f"""
@@ -1557,15 +1723,17 @@ class ChatService:
             
             with st.chat_message("assistant", avatar=Config.IMG_PROFILE):
                 # Verificar se é uma dúvida sobre autenticidade antes de chamar a API
-                lower_input = cleaned_input.lower()
-                if any(keyword in lower_input for keyword in Config.FAKE_DETECTION_KEYWORDS):
+                fake_probability = detect_fake_question(cleaned_input)
+                if fake_probability > 0.7:
                     resposta = {
                         "text": "Não sou fake não, amor! Ouça minha voz... 😘",
                         "audio": "nao_sou_fake_nao",
                         "cta": {"show": False}
                     }
                 else:
-                    resposta = ApiService.ask_gemini(cleaned_input, st.session_state.session_id, conn)
+                    # Usar cache com hash da conversa
+                    conversation_hash = generate_conversation_hash(st.session_state.messages, cleaned_input)
+                    resposta = ApiService.ask_gemini_cached(conversation_hash, cleaned_input, st.session_state.session_id, conn)
                 
                 if isinstance(resposta, str):
                     resposta = {"text": resposta, "cta": {"show": False}}
@@ -1584,7 +1752,6 @@ class ChatService:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Mostrar áudio se existir na resposta
                 if resposta.get("audio"):
                     UiService.show_audio_player(resposta["audio"])
                     st.session_state.audio_count += 1
@@ -1630,7 +1797,7 @@ def main():
         save_persistent_data()
         st.rerun()
     
-    if not st.session_state.chat_started:
+    if not st.session_state.chat_started and st.session_state.current_page == "chat":
         col1, col2, col3 = st.columns([1,3,1])
         with col2:
             st.markdown(f"""
@@ -1642,10 +1809,9 @@ def main():
             </div>
             """, unsafe_allow_html=True)
             
-            if st.button("💋 Iniciar Experiência", type="primary", use_container_width=True):
+            if st.button("💋 Iniciar Conversa", type="primary", use_container_width=True):
                 st.session_state.update({
-                    'chat_started': True,
-                    'current_page': 'chat'
+                    'chat_started': True
                 })
                 save_persistent_data()
                 st.rerun()
